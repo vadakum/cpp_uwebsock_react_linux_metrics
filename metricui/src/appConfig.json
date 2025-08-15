@@ -1,0 +1,4 @@
+{
+    "WebsockUrl" : "ws://localhost:9001",
+    "MaxStreamPoints": 30
+}

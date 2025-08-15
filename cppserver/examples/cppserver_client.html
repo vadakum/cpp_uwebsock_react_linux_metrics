@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test cppserver</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #0056b3;
+            text-align: center;
+        }
+
+        h4 {
+            color: #1e7702;
+            text-align: center;
+        }
+
+        #status {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .status-connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-connecting {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+
+        #label {
+            width: calc(100% - 100px);
+            padding: 10px;
+            margin-right: 10px;
+            border: 1px solid #ffeeba;
+            border-radius: 4px;
+            background-color: #b1adad;
+        }
+
+        #subscribeButton {
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: medium;
+        }
+
+        #subscribeButton:hover {
+            background-color: #0056b3;
+        }
+
+        #subscribeButton:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        #unsubButton {
+            padding: 10px 15px;
+            background-color: #b33620;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: medium;
+        }
+
+        #unsubButton:hover {
+            background-color: #b31f05;
+        }
+
+        #unsubButton:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }        
+
+        #messages {
+            border: 1px solid #eee;
+            padding: 15px;
+            min-height: 150px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+
+        .message-sent {
+            color: #007bff;
+            font-weight: bold;
+            font-size: medium;
+        }
+
+        .message-received {
+            color: #28a745;
+            font-size: small;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>WebSocket Client</h1>
+        <h4>URL: <span id="url"></span></h4>
+
+        <div id="status" class="status-disconnected">Disconnected</div>
+
+        <div>
+            <label id="label">Subscribe / Unsubscribe to cpu usage</label>
+            <button id="subscribeButton" disabled>Sub</button>
+            <button id="unsubButton" disabled>Unsub</button>
+        </div>
+
+        <h2>Messages:</h2>
+        <div id="messages">
+        </div>
+    </div>
+
+    <script>
+        const websocketUrl = 'ws://localhost:9001'; 
+        let socket;
+
+        const statusDiv = document.getElementById('status');
+        const subscribeButton = document.getElementById('subscribeButton');
+        const unsubButton = document.getElementById('unsubButton');
+        const messagesDiv = document.getElementById('messages');
+        const urlDiv = document.getElementById('url');
+        urlDiv.textContent = websocketUrl;
+
+
+        function updateStatus(isConnected) {
+            if (isConnected) {
+                statusDiv.textContent = 'Connected';
+                statusDiv.className = 'status-connected';
+                subscribeButton.disabled = false;
+                unsubButton.disabled = true;
+            } else {
+                statusDiv.textContent = 'Disconnected';
+                statusDiv.className = 'status-disconnected';
+                subscribeButton.disabled = true;
+                unsubButton.disabled = true;
+            }
+        }
+
+        function logMessage(text, type = 'received') {
+            const p = document.createElement('p');
+            p.textContent = text;
+            if (type === 'sent') {
+                p.classList.add('message-sent');
+            } else if (type === 'received') {
+                p.classList.add('message-received');
+            }
+            messagesDiv.children.length > 60 && messagesDiv.removeChild(messagesDiv.children[0]);            
+            messagesDiv.appendChild(p);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll to bottom
+        }
+
+        function connectWebSocket() {
+            statusDiv.textContent = 'Connecting...';
+            statusDiv.className = 'status-connecting';
+            subscribeButton.disabled = true;
+
+            socket = new WebSocket(websocketUrl);
+
+            socket.onopen = (event) => {
+                console.log('WebSocket Connected:', event);
+                updateStatus(true);
+                logMessage('Connected to server.', 'info');
+            };
+
+            socket.onmessage = (event) => {
+                //console.log('Message from server:', event.data);
+                logMessage(`Server: ${event.data}`, 'received');
+                const data = JSON.parse(event.data);
+                if (data.type === 'sub_response' && data.status === 'success') {
+                    subscribeButton.disabled = true;
+                    unsubButton.disabled = false;
+                } else if (data.type === 'unsub_response' && data.status === 'success') {
+                    subscribeButton.disabled = false;
+                    unsubButton.disabled = true;
+                }
+            };
+
+            socket.onclose = (event) => {
+                console.log('WebSocket Disconnected:', event);
+                updateStatus(false);
+                logMessage('Disconnected from server.', 'info');
+                // Attempt to reconnect after a short delay
+                setTimeout(connectWebSocket, 3000);
+            };
+
+            socket.onerror = (error) => {
+                console.error('WebSocket Error:', error);
+                updateStatus(false);
+                logMessage(`Connection Error: ${error.message || 'Unknown error'}`, 'error');
+            };
+        }
+
+        // Send message function
+        subscribeButton.addEventListener('click', () => {
+            const message = JSON.stringify({
+                "metric_name": "cpu_usage",
+                "type": "sub"
+            });
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(message);
+                logMessage(`Sent: ${message}`, 'sent');
+            } else if (socket && socket.readyState !== WebSocket.OPEN) {
+                logMessage('Not connected to the server. Please wait for connection.', 'error');
+            } else {
+                logMessage('Message cannot be empty.', 'error');
+            }
+        });
+
+        unsubButton.addEventListener('click', () => {
+            const message = JSON.stringify({
+                "metric_name": "cpu_usage",
+                "type": "unsub"
+            });
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(message);
+                logMessage(`Sent: ${message}`, 'sent');
+            } else if (socket && socket.readyState !== WebSocket.OPEN) {
+                logMessage('Not connected to the server. Please wait for connection.', 'error');
+            }
+        });
+
+        // Initial connection attempt
+        connectWebSocket();
+    </script>
+</body>
+
+</html>

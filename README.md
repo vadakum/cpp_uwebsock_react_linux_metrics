@@ -73,6 +73,6 @@ My backend (cppserver) was running on a vm, so vscode port forwarding helped
 
 ### Refrences
 - [Tanstack Start](https://tanstack.com/start/latest/docs/framework/react/build-from-scratch) and [Tanstack Router](https://tanstack.com/router/latest/docs/framework/react/overview) - are nice to get started with buiding React App.
-- [Matine](https://mantine.dev/) - for UI components.
+- [Mantine](https://mantine.dev/) - for UI components.
 - [Apache Echarts](https://echarts.apache.org/en/index.html) and [React Echarts](https://github.com/hustcc/echarts-for-react) - for Charts.
 
